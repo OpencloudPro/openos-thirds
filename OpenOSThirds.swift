@@ -14,19 +14,17 @@ struct ZoneLayout {
     let actions: [String]
     let labels: [String]
 
-    static let prefs = UserDefaults(suiteName: "pro.openos.thirds") ?? .standard
     static let modeKey = "zoneMode"
     static let wideCutoff: CGFloat = 3000
 
     static func mode() -> String {
-        let raw = prefs.string(forKey: modeKey) ?? "auto"
+        let raw = UserDefaults.standard.string(forKey: modeKey) ?? "auto"
         if raw == "two" || raw == "three" || raw == "auto" { return raw }
         return "auto"
     }
 
     static func setMode(_ mode: String) {
-        prefs.set(mode, forKey: modeKey)
-        prefs.synchronize()
+        UserDefaults.standard.set(mode, forKey: modeKey)
     }
 
     static func make(mode: String, screenWidth: CGFloat) -> ZoneLayout {
