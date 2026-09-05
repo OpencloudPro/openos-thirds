@@ -15,6 +15,7 @@ struct ZoneLayout {
     let labels: [String]
 
     static let modeKey = "zoneMode"
+    static let railKey = "showRail"
     static let wideCutoff: CGFloat = 3000
 
     static func mode() -> String {
@@ -25,6 +26,14 @@ struct ZoneLayout {
 
     static func setMode(_ mode: String) {
         UserDefaults.standard.set(mode, forKey: modeKey)
+    }
+
+    static func showRail() -> Bool {
+        UserDefaults.standard.bool(forKey: railKey)
+    }
+
+    static func setShowRail(_ on: Bool) {
+        UserDefaults.standard.set(on, forKey: railKey)
     }
 
     static func make(mode: String, screenWidth: CGFloat) -> ZoneLayout {
@@ -62,7 +71,6 @@ final class ThirdsController: NSObject {
     func start() {
         railPanel = makePanel(frame: .zero, ignoreMouse: false)
         layoutRail()
-        railPanel.orderFrontRegardless()
         setupStatusItem()
 
         screenObs = NotificationCenter.default.addObserver(
@@ -115,6 +123,10 @@ final class ThirdsController: NSObject {
     }
 
     private func layoutRail() {
+        guard ZoneLayout.showRail() else {
+            railPanel.orderOut(nil)
+            return
+        }
         let s = (NSScreen.main ?? screenAtMouse())
         currentLayout = layout(for: s)
         let r = NSRect(x: s.frame.maxX - railW, y: s.frame.minY, width: railW, height: s.frame.height)
@@ -124,6 +136,7 @@ final class ThirdsController: NSObject {
         }
         railPanel.contentView = rail
         railPanel.contentView?.needsDisplay = true
+        railPanel.orderFrontRegardless()
     }
 
     private func inRightHot(_ point: NSPoint, _ screen: NSScreen) -> Bool {
@@ -230,7 +243,6 @@ final class ThirdsController: NSObject {
         dropMode = false
         railPanel.ignoresMouseEvents = false
         layoutRail()
-        railPanel.orderFrontRegardless()
     }
 
     private func pick(_ action: String) {
@@ -277,6 +289,11 @@ final class ThirdsController: NSObject {
         menu.addItem(modeItem("Auto (por ecrã)", "auto", mode))
         menu.addItem(modeItem("2 zonas", "two", mode))
         menu.addItem(modeItem("3 zonas", "three", mode))
+        menu.addItem(.separator())
+        let rail = NSMenuItem(title: "Tab no bordo", action: #selector(toggleRail(_:)), keyEquivalent: "")
+        rail.target = self
+        rail.state = ZoneLayout.showRail() ? .on : .off
+        menu.addItem(rail)
         statusItem?.menu = menu
     }
 
@@ -291,6 +308,12 @@ final class ThirdsController: NSObject {
     @objc private func setMode(_ sender: NSMenuItem) {
         guard let value = sender.representedObject as? String else { return }
         ZoneLayout.setMode(value)
+        hideZones()
+        refreshStatus()
+    }
+
+    @objc private func toggleRail(_ sender: NSMenuItem) {
+        ZoneLayout.setShowRail(!ZoneLayout.showRail())
         hideZones()
         refreshStatus()
     }

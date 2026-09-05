@@ -22,9 +22,10 @@ A escolha fica em `defaults` `pro.openos.thirds` / `zoneMode` (`auto` | `two` | 
 
 Também dá:
 
-- arrastar a janela até ao **bordo direito** (faixa escura a altura toda)
-- clicar nessa faixa e depois clicar a zona
+- arrastar a janela até ao **bordo direito**
 - **⌃⌥1 / ⌃⌥2 / ⌃⌥3** (terços; no modo 2 zonas usa o overlay)
+
+O tab permanente no bordo vem **desligado**. Liga no ícone da barra → **Tab no bordo** se o quiseres.
 
 Clique direito curto continua a ser o menu. Esc fecha o overlay.
 
@@ -40,6 +41,6 @@ No Mac (Xcode CLT ou Xcode):
 ./install.sh
 ```
 
-Instala `~/Applications/OpenOSThirds.app` v1.2, LaunchAgent no login, e configura atalhos do Rectangle.
+Instala `~/Applications/OpenOSThirds.app` v1.3, LaunchAgent no login, e configura atalhos do Rectangle.
 
 Rectangle: System Settings → Privacy & Security → Accessibility → ligar **Rectangle**.
