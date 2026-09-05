@@ -9,7 +9,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-final class ThirdsController {
+struct ZoneLayout {
+    let count: Int
+    let actions: [String]
+    let labels: [String]
+
+    static let prefs = UserDefaults(suiteName: "pro.openos.thirds") ?? .standard
+    static let modeKey = "zoneMode"
+    static let wideCutoff: CGFloat = 3000
+
+    static func mode() -> String {
+        let raw = prefs.string(forKey: modeKey) ?? "auto"
+        if raw == "two" || raw == "three" || raw == "auto" { return raw }
+        return "auto"
+    }
+
+    static func setMode(_ mode: String) {
+        prefs.set(mode, forKey: modeKey)
+        prefs.synchronize()
+    }
+
+    static func make(mode: String, screenWidth: CGFloat) -> ZoneLayout {
+        let two = mode == "two" || (mode != "three" && screenWidth < wideCutoff)
+        if two {
+            return ZoneLayout(
+                count: 2,
+                actions: ["left-half", "right-half"],
+                labels: ["Esquerda", "Direita"]
+            )
+        }
+        return ZoneLayout(
+            count: 3,
+            actions: ["first-third", "center-third", "last-third"],
+            labels: ["Esquerda", "Meio", "Direita"]
+        )
+    }
+}
+
+final class ThirdsController: NSObject {
     private var railPanel: NSPanel!
     private var overlayPanel: NSPanel?
     private var overlayView: OverlayView?
@@ -18,24 +55,24 @@ final class ThirdsController {
     private var dropMode = false
     private var hoverIndex = -1
     private var rightHoldWork: DispatchWorkItem?
+    private var currentLayout = ZoneLayout.make(mode: "auto", screenWidth: 5120)
+    private var statusItem: NSStatusItem?
 
     private let railW: CGFloat = 36
     private let edgeHotW: CGFloat = 96
-    private let actions = ["first-third", "center-third", "last-third"]
 
     func start() {
         railPanel = makePanel(frame: .zero, ignoreMouse: false)
         layoutRail()
-        railPanel.contentView = RailView(frame: railPanel.contentView!.bounds) { [weak self] in
-            self?.showZones(dropMode: false)
-        }
         railPanel.orderFrontRegardless()
+        setupStatusItem()
 
         screenObs = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
             self?.layoutRail()
+            self?.refreshStatus()
         }
 
         func add(_ mask: NSEvent.EventTypeMask, _ handler: @escaping (NSEvent) -> Void) {
@@ -75,11 +112,19 @@ final class ThirdsController {
             ?? NSScreen.screens[0]
     }
 
+    private func layout(for screen: NSScreen) -> ZoneLayout {
+        ZoneLayout.make(mode: ZoneLayout.mode(), screenWidth: screen.frame.width)
+    }
+
     private func layoutRail() {
-        let s = (NSScreen.main ?? screenAtMouse()).frame
-        let r = NSRect(x: s.maxX - railW, y: s.minY, width: railW, height: s.height)
+        let s = (NSScreen.main ?? screenAtMouse())
+        currentLayout = layout(for: s)
+        let r = NSRect(x: s.frame.maxX - railW, y: s.frame.minY, width: railW, height: s.frame.height)
         railPanel.setFrame(r, display: true)
-        railPanel.contentView?.frame = railPanel.contentView?.bounds ?? .zero
+        let rail = RailView(frame: railPanel.contentView?.bounds ?? r, stripes: currentLayout.count) { [weak self] in
+            self?.showZones(dropMode: false)
+        }
+        railPanel.contentView = rail
         railPanel.contentView?.needsDisplay = true
     }
 
@@ -134,8 +179,8 @@ final class ThirdsController {
         guard overlayPanel != nil else { return }
         updateHover()
         if dropMode {
-            if hoverIndex >= 0 {
-                pick(actions[hoverIndex])
+            if hoverIndex >= 0, hoverIndex < currentLayout.actions.count {
+                pick(currentLayout.actions[hoverIndex])
             } else {
                 hideZones()
             }
@@ -162,8 +207,9 @@ final class ThirdsController {
         if overlayPanel != nil { return }
         self.dropMode = dropMode
         let screen = screenAtMouse()
+        currentLayout = layout(for: screen)
         let overlay = makePanel(frame: screen.frame, ignoreMouse: dropMode)
-        let view = OverlayView(frame: overlay.contentView!.bounds) { [weak self] action in
+        let view = OverlayView(frame: overlay.contentView!.bounds, layout: currentLayout) { [weak self] action in
             self?.pick(action)
         }
         view.onCancel = { [weak self] in self?.hideZones() }
@@ -216,12 +262,67 @@ final class ThirdsController {
         p.isMovable = false
         return p
     }
+
+    private func setupStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.button?.toolTip = "OpenOS Thirds — 2 ou 3 zonas"
+        item.button?.imagePosition = .imageOnly
+        statusItem = item
+        refreshStatus()
+    }
+
+    private func refreshStatus() {
+        let mode = ZoneLayout.mode()
+        let preview = layout(for: screenAtMouse())
+        statusItem?.button?.image = statusImage(count: preview.count)
+        let menu = NSMenu()
+        menu.addItem(modeItem("Auto (por ecrã)", "auto", mode))
+        menu.addItem(modeItem("2 zonas", "two", mode))
+        menu.addItem(modeItem("3 zonas", "three", mode))
+        statusItem?.menu = menu
+    }
+
+    private func modeItem(_ title: String, _ value: String, _ current: String) -> NSMenuItem {
+        let it = NSMenuItem(title: title, action: #selector(setMode(_:)), keyEquivalent: "")
+        it.target = self
+        it.representedObject = value
+        it.state = current == value ? .on : .off
+        return it
+    }
+
+    @objc private func setMode(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String else { return }
+        ZoneLayout.setMode(value)
+        hideZones()
+        refreshStatus()
+    }
+
+    private func statusImage(count: Int) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let img = NSImage(size: size)
+        img.lockFocus()
+        NSColor.black.setFill()
+        let n = max(2, min(3, count))
+        let barW: CGFloat = 3
+        let gap: CGFloat = 3
+        let total = CGFloat(n) * barW + CGFloat(n - 1) * gap
+        var x = (size.width - total) / 2
+        for _ in 0..<n {
+            NSBezierPath(roundedRect: NSRect(x: x, y: 3, width: barW, height: 12), xRadius: 1, yRadius: 1).fill()
+            x += barW + gap
+        }
+        img.unlockFocus()
+        img.isTemplate = true
+        return img
+    }
 }
 
 final class RailView: NSView {
     let onClick: () -> Void
-    init(frame: NSRect, onClick: @escaping () -> Void) {
+    let stripes: Int
+    init(frame: NSRect, stripes: Int, onClick: @escaping () -> Void) {
         self.onClick = onClick
+        self.stripes = stripes
         super.init(frame: frame)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -239,13 +340,14 @@ final class RailView: NSView {
         NSColor.white.withAlphaComponent(0.92).setStroke()
         path.lineWidth = 1.5
         path.stroke()
+        let n = max(2, min(3, stripes))
         let gap: CGFloat = 5
         let stripeW: CGFloat = 3
-        let total = stripeW * 3 + gap * 2
+        let total = stripeW * CGFloat(n) + gap * CGFloat(n - 1)
         var x = r.midX - total / 2
         let y = r.minY + 22
         let h = r.height - 44
-        for _ in 0..<3 {
+        for _ in 0..<n {
             NSColor.white.withAlphaComponent(0.95).setFill()
             NSBezierPath(roundedRect: NSRect(x: x, y: y, width: stripeW, height: h), xRadius: 1.5, yRadius: 1.5).fill()
             x += stripeW + gap
@@ -256,12 +358,14 @@ final class RailView: NSView {
 final class OverlayView: NSView {
     let onPick: (String) -> Void
     var onCancel: (() -> Void)?
-    private let actions = ["first-third", "center-third", "last-third"]
-    private let labels = ["Esquerda", "Meio", "Direita"]
+    private let actions: [String]
+    private let labels: [String]
     var hover = -1
 
-    init(frame: NSRect, onPick: @escaping (String) -> Void) {
+    init(frame: NSRect, layout: ZoneLayout, onPick: @escaping (String) -> Void) {
         self.onPick = onPick
+        self.actions = layout.actions
+        self.labels = layout.labels
         super.init(frame: frame)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -293,11 +397,12 @@ final class OverlayView: NSView {
         columnRects().firstIndex { $0.contains(p) } ?? -1
     }
     private func columnRects() -> [NSRect] {
+        let n = CGFloat(max(actions.count, 1))
         let gap: CGFloat = 18
         let inset: CGFloat = 22
-        let w = (bounds.width - inset * 2 - gap * 2) / 3
+        let w = (bounds.width - inset * 2 - gap * (n - 1)) / n
         let h = bounds.height - inset * 2
-        return (0..<3).map { i in
+        return (0..<Int(n)).map { i in
             NSRect(x: inset + CGFloat(i) * (w + gap), y: inset, width: w, height: h)
         }
     }
