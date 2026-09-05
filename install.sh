@@ -31,9 +31,9 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleVersion</key>
-  <string>2</string>
+  <string>3</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.1</string>
+  <string>1.2</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>LSUIElement</key>
@@ -97,8 +97,14 @@ if [[ -n "$RECT" ]]; then
   end tell" >/dev/null 2>&1 || true
 fi
 
+if [[ -n "${ZONE_MODE:-}" ]]; then
+  defaults write pro.openos.thirds zoneMode "$ZONE_MODE"
+  echo "=== zoneMode $ZONE_MODE ==="
+fi
+
 sleep 0.6
 echo "=== running ==="
 pgrep -lf OpenOSThirds || echo "OpenOSThirds not running"
 defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString
+defaults read pro.openos.thirds zoneMode 2>/dev/null || echo "zoneMode auto"
 echo "OK $APP"
