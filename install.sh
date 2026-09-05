@@ -47,6 +47,8 @@ PLIST
 echo "=== compile ==="
 xcrun swiftc -O -sdk "$(xcrun --show-sdk-path --sdk macosx)" -o "$BIN" "$SRC"
 chmod +x "$BIN"
+xattr -cr "$APP" 2>/dev/null || true
+codesign --force --deep --sign - "$APP" >/dev/null
 
 cat > "$PLIST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
