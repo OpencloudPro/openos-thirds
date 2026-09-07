@@ -9,18 +9,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+struct Zone {
+    let action: String
+    let label: String
+    let nx: CGFloat
+    let ny: CGFloat
+    let nw: CGFloat
+    let nh: CGFloat
+}
+
 struct ZoneLayout {
-    let count: Int
-    let actions: [String]
-    let labels: [String]
+    let id: String
+    let title: String
+    let zones: [Zone]
+
+    var count: Int { zones.count }
+    var actions: [String] { zones.map(\.action) }
+    var labels: [String] { zones.map(\.label) }
 
     static let modeKey = "zoneMode"
     static let railKey = "showRail"
     static let wideCutoff: CGFloat = 3000
 
+    static let catalog: [(id: String, title: String)] = [
+        ("auto", "Auto (por ecrã)"),
+        ("two", "2 iguais"),
+        ("three", "3 iguais"),
+        ("wideRight", "2/3 + 1/3"),
+        ("wideLeft", "1/3 + 2/3"),
+        ("corners", "4 cantos"),
+        ("rows", "Cima / Baixo"),
+        ("mainRight", "1 grande + 2 dir."),
+        ("mainLeft", "2 esq. + 1 grande"),
+        ("center", "1/4 + 1/2 + 1/4"),
+        ("four", "4 colunas"),
+    ]
+
     static func mode() -> String {
         let raw = UserDefaults.standard.string(forKey: modeKey) ?? "auto"
-        if raw == "two" || raw == "three" || raw == "auto" { return raw }
+        if catalog.contains(where: { $0.id == raw }) { return raw }
         return "auto"
     }
 
@@ -36,20 +63,74 @@ struct ZoneLayout {
         UserDefaults.standard.set(on, forKey: railKey)
     }
 
-    static func make(mode: String, screenWidth: CGFloat) -> ZoneLayout {
-        let two = mode == "two" || (mode != "three" && screenWidth < wideCutoff)
-        if two {
-            return ZoneLayout(
-                count: 2,
-                actions: ["left-half", "right-half"],
-                labels: ["Esquerda", "Direita"]
-            )
+    static func resolve(_ mode: String, screenWidth: CGFloat) -> String {
+        if mode == "auto" {
+            return screenWidth >= wideCutoff ? "three" : "two"
         }
-        return ZoneLayout(
-            count: 3,
-            actions: ["first-third", "center-third", "last-third"],
-            labels: ["Esquerda", "Meio", "Direita"]
-        )
+        return mode
+    }
+
+    static func make(mode: String, screenWidth: CGFloat) -> ZoneLayout {
+        switch resolve(mode, screenWidth: screenWidth) {
+        case "three":
+            return ZoneLayout(id: "three", title: "3 iguais", zones: [
+                Zone(action: "first-third", label: "Esquerda", nx: 0, ny: 0, nw: 1 / 3, nh: 1),
+                Zone(action: "center-third", label: "Meio", nx: 1 / 3, ny: 0, nw: 1 / 3, nh: 1),
+                Zone(action: "last-third", label: "Direita", nx: 2 / 3, ny: 0, nw: 1 / 3, nh: 1),
+            ])
+        case "wideRight":
+            return ZoneLayout(id: "wideRight", title: "2/3 + 1/3", zones: [
+                Zone(action: "first-two-thirds", label: "Grande", nx: 0, ny: 0, nw: 2 / 3, nh: 1),
+                Zone(action: "last-third", label: "Pequena", nx: 2 / 3, ny: 0, nw: 1 / 3, nh: 1),
+            ])
+        case "wideLeft":
+            return ZoneLayout(id: "wideLeft", title: "1/3 + 2/3", zones: [
+                Zone(action: "first-third", label: "Pequena", nx: 0, ny: 0, nw: 1 / 3, nh: 1),
+                Zone(action: "last-two-thirds", label: "Grande", nx: 1 / 3, ny: 0, nw: 2 / 3, nh: 1),
+            ])
+        case "corners":
+            return ZoneLayout(id: "corners", title: "4 cantos", zones: [
+                Zone(action: "top-left", label: "Cima esq.", nx: 0, ny: 0.5, nw: 0.5, nh: 0.5),
+                Zone(action: "top-right", label: "Cima dir.", nx: 0.5, ny: 0.5, nw: 0.5, nh: 0.5),
+                Zone(action: "bottom-left", label: "Baixo esq.", nx: 0, ny: 0, nw: 0.5, nh: 0.5),
+                Zone(action: "bottom-right", label: "Baixo dir.", nx: 0.5, ny: 0, nw: 0.5, nh: 0.5),
+            ])
+        case "rows":
+            return ZoneLayout(id: "rows", title: "Cima / Baixo", zones: [
+                Zone(action: "top-half", label: "Cima", nx: 0, ny: 0.5, nw: 1, nh: 0.5),
+                Zone(action: "bottom-half", label: "Baixo", nx: 0, ny: 0, nw: 1, nh: 0.5),
+            ])
+        case "mainRight":
+            return ZoneLayout(id: "mainRight", title: "1 grande + 2 dir.", zones: [
+                Zone(action: "left-half", label: "Grande", nx: 0, ny: 0, nw: 0.5, nh: 1),
+                Zone(action: "top-right", label: "Cima", nx: 0.5, ny: 0.5, nw: 0.5, nh: 0.5),
+                Zone(action: "bottom-right", label: "Baixo", nx: 0.5, ny: 0, nw: 0.5, nh: 0.5),
+            ])
+        case "mainLeft":
+            return ZoneLayout(id: "mainLeft", title: "2 esq. + 1 grande", zones: [
+                Zone(action: "top-left", label: "Cima", nx: 0, ny: 0.5, nw: 0.5, nh: 0.5),
+                Zone(action: "bottom-left", label: "Baixo", nx: 0, ny: 0, nw: 0.5, nh: 0.5),
+                Zone(action: "right-half", label: "Grande", nx: 0.5, ny: 0, nw: 0.5, nh: 1),
+            ])
+        case "center":
+            return ZoneLayout(id: "center", title: "1/4 + 1/2 + 1/4", zones: [
+                Zone(action: "first-fourth", label: "Esq.", nx: 0, ny: 0, nw: 0.25, nh: 1),
+                Zone(action: "center-half", label: "Meio", nx: 0.25, ny: 0, nw: 0.5, nh: 1),
+                Zone(action: "last-fourth", label: "Dir.", nx: 0.75, ny: 0, nw: 0.25, nh: 1),
+            ])
+        case "four":
+            return ZoneLayout(id: "four", title: "4 colunas", zones: [
+                Zone(action: "first-fourth", label: "1", nx: 0, ny: 0, nw: 0.25, nh: 1),
+                Zone(action: "second-fourth", label: "2", nx: 0.25, ny: 0, nw: 0.25, nh: 1),
+                Zone(action: "third-fourth", label: "3", nx: 0.5, ny: 0, nw: 0.25, nh: 1),
+                Zone(action: "last-fourth", label: "4", nx: 0.75, ny: 0, nw: 0.25, nh: 1),
+            ])
+        default:
+            return ZoneLayout(id: "two", title: "2 iguais", zones: [
+                Zone(action: "left-half", label: "Esquerda", nx: 0, ny: 0, nw: 0.5, nh: 1),
+                Zone(action: "right-half", label: "Direita", nx: 0.5, ny: 0, nw: 0.5, nh: 1),
+            ])
+        }
     }
 }
 
@@ -131,7 +212,7 @@ final class ThirdsController: NSObject {
         currentLayout = layout(for: s)
         let r = NSRect(x: s.frame.maxX - railW, y: s.frame.minY, width: railW, height: s.frame.height)
         railPanel.setFrame(r, display: true)
-        let rail = RailView(frame: railPanel.contentView?.bounds ?? r, stripes: currentLayout.count) { [weak self] in
+        let rail = RailView(frame: railPanel.contentView?.bounds ?? r, layout: currentLayout) { [weak self] in
             self?.showZones(dropMode: false)
         }
         railPanel.contentView = rail
@@ -275,7 +356,7 @@ final class ThirdsController: NSObject {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.toolTip = "OpenOS Thirds — 2 ou 3 zonas"
+        item.button?.toolTip = "OpenOS Thirds — zonas"
         item.button?.imagePosition = .imageOnly
         statusItem = item
         refreshStatus()
@@ -284,11 +365,11 @@ final class ThirdsController: NSObject {
     private func refreshStatus() {
         let mode = ZoneLayout.mode()
         let preview = layout(for: screenAtMouse())
-        statusItem?.button?.image = statusImage(count: preview.count)
+        statusItem?.button?.image = LayoutIcon.image(layout: preview, size: 18)
         let menu = NSMenu()
-        menu.addItem(modeItem("Auto (por ecrã)", "auto", mode))
-        menu.addItem(modeItem("2 zonas", "two", mode))
-        menu.addItem(modeItem("3 zonas", "three", mode))
+        for item in ZoneLayout.catalog {
+            menu.addItem(modeItem(item.title, item.id, mode))
+        }
         menu.addItem(.separator())
         let rail = NSMenuItem(title: "Tab no bordo", action: #selector(toggleRail(_:)), keyEquivalent: "")
         rail.target = self
@@ -302,6 +383,8 @@ final class ThirdsController: NSObject {
         it.target = self
         it.representedObject = value
         it.state = current == value ? .on : .off
+        let w = screenAtMouse().frame.width
+        it.image = LayoutIcon.image(layout: ZoneLayout.make(mode: value, screenWidth: w), size: 14)
         return it
     }
 
@@ -317,22 +400,28 @@ final class ThirdsController: NSObject {
         hideZones()
         refreshStatus()
     }
+}
 
-    private func statusImage(count: Int) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let img = NSImage(size: size)
-        img.lockFocus()
-        NSColor.black.setFill()
-        let n = max(2, min(3, count))
-        let barW: CGFloat = 3
-        let gap: CGFloat = 3
-        let total = CGFloat(n) * barW + CGFloat(n - 1) * gap
-        var x = (size.width - total) / 2
-        for _ in 0..<n {
-            NSBezierPath(roundedRect: NSRect(x: x, y: 3, width: barW, height: 12), xRadius: 1, yRadius: 1).fill()
-            x += barW + gap
+enum LayoutIcon {
+    static func image(layout: ZoneLayout, size: CGFloat) -> NSImage {
+        let s = NSSize(width: size, height: size)
+        let img = NSImage(size: s, flipped: false) { _ in
+            let pad: CGFloat = size * 0.12
+            let box = NSRect(x: pad, y: pad, width: size - pad * 2, height: size - pad * 2)
+            let gap: CGFloat = max(1, size * 0.06)
+            NSColor.black.setFill()
+            for z in layout.zones {
+                var r = NSRect(
+                    x: box.minX + z.nx * box.width,
+                    y: box.minY + z.ny * box.height,
+                    width: z.nw * box.width,
+                    height: z.nh * box.height
+                )
+                r = r.insetBy(dx: gap / 2, dy: gap / 2)
+                NSBezierPath(roundedRect: r, xRadius: 1.2, yRadius: 1.2).fill()
+            }
+            return true
         }
-        img.unlockFocus()
         img.isTemplate = true
         return img
     }
@@ -340,10 +429,10 @@ final class ThirdsController: NSObject {
 
 final class RailView: NSView {
     let onClick: () -> Void
-    let stripes: Int
-    init(frame: NSRect, stripes: Int, onClick: @escaping () -> Void) {
+    let layout: ZoneLayout
+    init(frame: NSRect, layout: ZoneLayout, onClick: @escaping () -> Void) {
         self.onClick = onClick
-        self.stripes = stripes
+        self.layout = layout
         super.init(frame: frame)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -361,17 +450,18 @@ final class RailView: NSView {
         NSColor.white.withAlphaComponent(0.92).setStroke()
         path.lineWidth = 1.5
         path.stroke()
-        let n = max(2, min(3, stripes))
-        let gap: CGFloat = 5
-        let stripeW: CGFloat = 3
-        let total = stripeW * CGFloat(n) + gap * CGFloat(n - 1)
-        var x = r.midX - total / 2
-        let y = r.minY + 22
-        let h = r.height - 44
-        for _ in 0..<n {
-            NSColor.white.withAlphaComponent(0.95).setFill()
-            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: stripeW, height: h), xRadius: 1.5, yRadius: 1.5).fill()
-            x += stripeW + gap
+        let inner = r.insetBy(dx: 7, dy: 22)
+        let gap: CGFloat = 3
+        NSColor.white.withAlphaComponent(0.95).setFill()
+        for z in layout.zones {
+            var zr = NSRect(
+                x: inner.minX + z.nx * inner.width,
+                y: inner.minY + z.ny * inner.height,
+                width: z.nw * inner.width,
+                height: z.nh * inner.height
+            )
+            zr = zr.insetBy(dx: gap / 2, dy: gap / 2)
+            NSBezierPath(roundedRect: zr, xRadius: 2, yRadius: 2).fill()
         }
     }
 }
@@ -379,14 +469,12 @@ final class RailView: NSView {
 final class OverlayView: NSView {
     let onPick: (String) -> Void
     var onCancel: (() -> Void)?
-    private let actions: [String]
-    private let labels: [String]
+    private let layout: ZoneLayout
     var hover = -1
 
     init(frame: NSRect, layout: ZoneLayout, onPick: @escaping (String) -> Void) {
         self.onPick = onPick
-        self.actions = layout.actions
-        self.labels = layout.labels
+        self.layout = layout
         super.init(frame: frame)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -412,25 +500,31 @@ final class OverlayView: NSView {
     }
     private func click(_ event: NSEvent) {
         let i = index(at: convert(event.locationInWindow, from: nil))
-        if i >= 0 { onPick(actions[i]) } else { onCancel?() }
+        if i >= 0 { onPick(layout.actions[i]) } else { onCancel?() }
     }
     func index(at p: NSPoint) -> Int {
-        columnRects().firstIndex { $0.contains(p) } ?? -1
+        zoneRects().firstIndex { $0.contains(p) } ?? -1
     }
-    private func columnRects() -> [NSRect] {
-        let n = CGFloat(max(actions.count, 1))
-        let gap: CGFloat = 18
+    private func zoneRects() -> [NSRect] {
+        let gap: CGFloat = 14
         let inset: CGFloat = 22
-        let w = (bounds.width - inset * 2 - gap * (n - 1)) / n
-        let h = bounds.height - inset * 2
-        return (0..<Int(n)).map { i in
-            NSRect(x: inset + CGFloat(i) * (w + gap), y: inset, width: w, height: h)
+        let box = bounds.insetBy(dx: inset, dy: inset)
+        return layout.zones.map { z in
+            var r = NSRect(
+                x: box.minX + z.nx * box.width,
+                y: box.minY + z.ny * box.height,
+                width: z.nw * box.width,
+                height: z.nh * box.height
+            )
+            r = r.insetBy(dx: gap / 2, dy: gap / 2)
+            return r
         }
     }
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.withAlphaComponent(0.40).setFill()
         bounds.fill()
-        for (i, r) in columnRects().enumerated() {
+        let rects = zoneRects()
+        for (i, r) in rects.enumerated() {
             let path = NSBezierPath(roundedRect: r, xRadius: 16, yRadius: 16)
             if i == hover {
                 NSColor.systemBlue.withAlphaComponent(0.52).setFill()
@@ -441,14 +535,15 @@ final class OverlayView: NSView {
             NSColor.white.withAlphaComponent(0.70).setStroke()
             path.lineWidth = 2
             path.stroke()
-            let title = labels[i] as NSString
+            let title = layout.labels[i] as NSString
+            let fontSize: CGFloat = r.height < 120 ? 22 : 32
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 32, weight: .semibold),
+                .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
                 .foregroundColor: NSColor.white
             ]
             let size = title.size(withAttributes: attrs)
             title.draw(
-                at: NSPoint(x: r.midX - size.width / 2, y: r.midY - size.height / 2 + 14),
+                at: NSPoint(x: r.midX - size.width / 2, y: r.midY - size.height / 2 + 10),
                 withAttributes: attrs
             )
             let sub = "Larga aqui" as NSString
@@ -457,10 +552,12 @@ final class OverlayView: NSView {
                 .foregroundColor: NSColor.white.withAlphaComponent(0.82)
             ]
             let ss = sub.size(withAttributes: subAttrs)
-            sub.draw(
-                at: NSPoint(x: r.midX - ss.width / 2, y: r.midY - size.height / 2 - 18),
-                withAttributes: subAttrs
-            )
+            if r.height > 90 {
+                sub.draw(
+                    at: NSPoint(x: r.midX - ss.width / 2, y: r.midY - size.height / 2 - 16),
+                    withAttributes: subAttrs
+                )
+            }
         }
     }
 }
