@@ -1,33 +1,38 @@
 # OpenOS Thirds
 
-Overlay de **2 ou 3** colunas iguais, altura total, para macOS. Feito para o C49 5120×1440 (3 zonas) e para o MacBook (2 zonas).
+Overlay de zonas no ecrã. Menu bar = widget para escolher o layout.
 
 Não é da App Store. Corre em fundo (sem ícone no Dock) via LaunchAgent `pro.openos.thirds`.
 
-## Zonas
+## Zonas (v1.4)
 
-No ícone da barra de menu (2 ou 3 riscos):
+No ícone da barra (preview do layout actual):
 
-- **Auto (por ecrã)** — ecrã ≥ 3000 px de largura → 3 zonas; senão → 2
-- **2 zonas** — Esquerda / Direita (`left-half` / `right-half`)
-- **3 zonas** — Esquerda / Meio / Direita (`first-third` / `center-third` / `last-third`)
+| Menu | O quê |
+|---|---|
+| **Auto (por ecrã)** | ≥ 3000 px → 3 iguais; senão → 2 |
+| **2 iguais** | Esq / Dir |
+| **3 iguais** | Esq / Meio / Dir |
+| **2/3 + 1/3** | 1 grande + 1 menor (direita) |
+| **1/3 + 2/3** | 1 menor + 1 grande |
+| **4 cantos** | TL / TR / BL / BR |
+| **Cima / Baixo** | 2 faixas |
+| **1 grande + 2 dir.** | metade + 2 quadrantes |
+| **2 esq. + 1 grande** | espelho |
+| **1/4 + 1/2 + 1/4** | editor no meio |
+| **4 colunas** | ultrawide |
 
-A escolha fica em `defaults` `pro.openos.thirds` / `zoneMode` (`auto` | `two` | `three`).
+A escolha fica em `defaults` `pro.openos.thirds` / `zoneMode`.
 
 ## Como usar
 
-1. Clica a janela (botão esquerdo) para ela ficar à frente.
-2. **Segura o botão direito** (~⅓ de segundo). Abrem as zonas.
+1. Clica a janela (esquerdo) para ela ficar à frente.
+2. **Segura o direito** (~⅓ s). Abrem as zonas.
 3. Sem largar, leva o rato à zona e **larga**.
 
-Também dá:
+Também: arrastar ao **bordo direito** · **⌃⌥1/2/3** (terços). Esc fecha.
 
-- arrastar a janela até ao **bordo direito**
-- **⌃⌥1 / ⌃⌥2 / ⌃⌥3** (terços; no modo 2 zonas usa o overlay)
-
-O tab permanente no bordo vem **desligado**. Liga no ícone da barra → **Tab no bordo** se o quiseres.
-
-Clique direito curto continua a ser o menu. Esc fecha o overlay.
+O tab permanente no bordo vem **desligado**. Liga no ícone → **Tab no bordo**.
 
 ## Dependência
 
@@ -35,12 +40,8 @@ O overlay é desta app. O snap é o [Rectangle](https://github.com/rxhanson/Rect
 
 ## Instalar
 
-No Mac (Xcode CLT ou Xcode):
-
 ```bash
 ./install.sh
 ```
 
-Instala `~/Applications/OpenOSThirds.app` v1.3, LaunchAgent no login, e configura atalhos do Rectangle.
-
-Rectangle: System Settings → Privacy & Security → Accessibility → ligar **Rectangle**.
+`~/Applications/OpenOSThirds.app` v1.4 + LaunchAgent. Rectangle: Definições → Privacidade → Acessibilidade.
