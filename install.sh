@@ -31,9 +31,9 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleVersion</key>
-  <string>4</string>
+  <string>5</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.3</string>
+  <string>1.4</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>LSUIElement</key>
@@ -104,8 +104,12 @@ if [[ -n "${ZONE_MODE:-}" ]]; then
   echo "=== zoneMode $ZONE_MODE ==="
 fi
 if [[ -n "${SHOW_RAIL:-}" ]]; then
-  defaults write pro.openos.thirds showRail -bool "$SHOW_RAIL"
-  echo "=== showRail $SHOW_RAIL ==="
+  case "$SHOW_RAIL" in
+    1|true|TRUE|yes|YES|on|ON) rail=true ;;
+    *) rail=false ;;
+  esac
+  defaults write pro.openos.thirds showRail -bool "$rail"
+  echo "=== showRail $rail ==="
 fi
 
 sleep 0.6
