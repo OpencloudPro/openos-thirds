@@ -4,7 +4,7 @@ Overlay de zonas no ecrã. Menu bar = widget para escolher o layout.
 
 Não é da App Store. Corre em fundo (sem ícone no Dock) via LaunchAgent `pro.openos.thirds`.
 
-## Zonas (v1.4)
+## Zonas (v1.5)
 
 No ícone da barra (preview do layout actual):
 
@@ -27,10 +27,12 @@ A escolha fica em `defaults` `pro.openos.thirds` / `zoneMode`.
 ## Como usar
 
 1. Clica a janela (esquerdo) para ela ficar à frente.
-2. **Segura o direito** (~⅓ s). Abrem as zonas.
+2. **Segura o direito e arrasta** (~⅓ s + 16 px). Abrem as zonas.
 3. Sem largar, leva o rato à zona e **larga**.
 
-Também: arrastar ao **bordo direito** · **⌃⌥1/2/3** (terços). Esc fecha.
+Também: **arrastar a janela** ao bordo direito · **⌃⌥1/2/3** (terços). Esc fecha.
+
+O overlay **não** abre ao seleccionar ficheiros, no menu de contexto, nem noutro arrasto que não mexa a janela.
 
 O tab permanente no bordo vem **desligado**. Liga no ícone → **Tab no bordo**.
 
@@ -44,4 +46,4 @@ O overlay é desta app. O snap é o [Rectangle](https://github.com/rxhanson/Rect
 ./install.sh
 ```
 
-`~/Applications/OpenOSThirds.app` v1.4 + LaunchAgent. Rectangle: Definições → Privacidade → Acessibilidade.
+`~/Applications/OpenOSThirds.app` v1.5 + LaunchAgent. Rectangle: Definições → Privacidade → Acessibilidade.
