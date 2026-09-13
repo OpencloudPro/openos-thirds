@@ -143,11 +143,16 @@ final class ThirdsController: NSObject {
     private var dropMode = false
     private var hoverIndex = -1
     private var rightHoldWork: DispatchWorkItem?
+    private var rightDownAt: NSPoint?
+    private var leftSnap: [CGWindowID: CGRect] = [:]
+    private var windowDrag = false
     private var currentLayout = ZoneLayout.make(mode: "auto", screenWidth: 5120)
     private var statusItem: NSStatusItem?
 
     private let railW: CGFloat = 36
     private let edgeHotW: CGFloat = 96
+    private let windowMoveSlop: CGFloat = 6
+    private let rightHoldMove: CGFloat = 16
 
     func start() {
         railPanel = makePanel(frame: .zero, ignoreMouse: false)
@@ -168,8 +173,10 @@ final class ThirdsController: NSObject {
             }
         }
 
+        add(.leftMouseDown) { [weak self] _ in self?.onLeftDown() }
         add(.rightMouseDown) { [weak self] e in self?.onRightDown(e) }
         add(.leftMouseDragged) { [weak self] e in self?.onLeftDrag(e) }
+        add(.rightMouseDragged) { [weak self] _ in self?.onRightDrag() }
         add([.leftMouseUp, .rightMouseUp]) { [weak self] e in self?.onMouseUp(e) }
         add(.mouseMoved) { [weak self] _ in self?.onMouseMoved() }
         add(.keyDown) { [weak self] e in
@@ -227,11 +234,75 @@ final class ThirdsController: NSObject {
     private func leftDown() -> Bool { (NSEvent.pressedMouseButtons & (1 << 0)) != 0 }
     private func rightDown() -> Bool { (NSEvent.pressedMouseButtons & (1 << 1)) != 0 }
 
+    private func snapshotWindows() -> [CGWindowID: CGRect] {
+        let opts = CGWindowListOption.optionOnScreenOnly.union(.excludeDesktopElements)
+        guard let info = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else {
+            return [:]
+        }
+        let me = Int(ProcessInfo.processInfo.processIdentifier)
+        var out: [CGWindowID: CGRect] = [:]
+        for w in info {
+            if (w[kCGWindowOwnerPID as String] as? Int) == me { continue }
+            if (w[kCGWindowLayer as String] as? Int) != 0 { continue }
+            guard let num = w[kCGWindowNumber as String] as? CGWindowID else { continue }
+            guard let b = w[kCGWindowBounds as String] as? [String: Any],
+                  let x = (b["X"] as? NSNumber)?.doubleValue,
+                  let y = (b["Y"] as? NSNumber)?.doubleValue,
+                  let ww = (b["Width"] as? NSNumber)?.doubleValue,
+                  let hh = (b["Height"] as? NSNumber)?.doubleValue
+            else { continue }
+            if ww < 80 || hh < 48 { continue }
+            out[num] = CGRect(x: x, y: y, width: ww, height: hh)
+        }
+        return out
+    }
+
+    private func confirmWindowDrag() -> Bool {
+        if windowDrag { return true }
+        let now = snapshotWindows()
+        let slop = windowMoveSlop * windowMoveSlop
+        for (id, rect) in now {
+            guard let old = leftSnap[id] else { continue }
+            let dx = rect.minX - old.minX
+            let dy = rect.minY - old.minY
+            if (dx * dx + dy * dy) > slop {
+                windowDrag = true
+                return true
+            }
+        }
+        return false
+    }
+
+    private func rightHoldMoved() -> Bool {
+        guard let origin = rightDownAt else { return false }
+        let p = NSEvent.mouseLocation
+        let dx = p.x - origin.x
+        let dy = p.y - origin.y
+        return (dx * dx + dy * dy) >= (rightHoldMove * rightHoldMove)
+    }
+
+    private func showIfWindowDrop(at loc: NSPoint) {
+        let s = screenAtMouse()
+        guard inRightHot(loc, s), confirmWindowDrag() else { return }
+        prepareDropChrome()
+        showZones(dropMode: true)
+    }
+
+    private func showIfRightHoldDrag() {
+        guard overlayPanel == nil, rightDown(), rightHoldMoved() else { return }
+        prepareDropChrome()
+        showZones(dropMode: true)
+    }
+
+    private func onLeftDown() {
+        leftSnap = snapshotWindows()
+        windowDrag = false
+    }
+
     private func onRightDown(_ event: NSEvent) {
         if overlayPanel != nil { return }
-        let loc = NSEvent.mouseLocation
-        let s = screenAtMouse()
-        if leftDown() || inRightHot(loc, s) {
+        rightDownAt = NSEvent.mouseLocation
+        if leftDown(), confirmWindowDrag() {
             rightHoldWork?.cancel()
             prepareDropChrome()
             showZones(dropMode: true)
@@ -239,12 +310,18 @@ final class ThirdsController: NSObject {
         }
         rightHoldWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.rightDown(), self.overlayPanel == nil else { return }
-            self.prepareDropChrome()
-            self.showZones(dropMode: true)
+            self?.showIfRightHoldDrag()
         }
         rightHoldWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32, execute: work)
+    }
+
+    private func onRightDrag() {
+        if overlayPanel != nil {
+            updateHover()
+            return
+        }
+        showIfRightHoldDrag()
     }
 
     private func onLeftDrag(_ event: NSEvent) {
@@ -252,12 +329,7 @@ final class ThirdsController: NSObject {
             updateHover()
             return
         }
-        let loc = NSEvent.mouseLocation
-        let s = screenAtMouse()
-        if inRightHot(loc, s) {
-            prepareDropChrome()
-            showZones(dropMode: true)
-        }
+        showIfWindowDrop(at: NSEvent.mouseLocation)
     }
 
     private func onMouseMoved() {
@@ -268,6 +340,9 @@ final class ThirdsController: NSObject {
     private func onMouseUp(_ event: NSEvent) {
         rightHoldWork?.cancel()
         rightHoldWork = nil
+        rightDownAt = nil
+        leftSnap = [:]
+        windowDrag = false
         guard overlayPanel != nil else { return }
         updateHover()
         if dropMode {
