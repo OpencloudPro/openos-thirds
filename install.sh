@@ -3,13 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SRC="$ROOT/OpenOSThirds.swift"
+GEO="$ROOT/SnapGeometry.swift"
 APP="$HOME/Applications/OpenOSThirds.app"
 BIN="$APP/Contents/MacOS/OpenOSThirds"
 PLIST="$HOME/Library/LaunchAgents/pro.openos.thirds.plist"
 LABEL="gui/$(id -u)/pro.openos.thirds"
 
-if [[ ! -f "$SRC" ]]; then
-  echo "missing $SRC" >&2
+if [[ ! -f "$SRC" || ! -f "$GEO" ]]; then
+  echo "missing $SRC or $GEO" >&2
   exit 1
 fi
 
@@ -31,9 +32,9 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleVersion</key>
-  <string>6</string>
+  <string>7</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.5</string>
+  <string>1.6</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>LSUIElement</key>
@@ -45,7 +46,7 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
 PLIST
 
 echo "=== compile ==="
-xcrun swiftc -O -sdk "$(xcrun --show-sdk-path --sdk macosx)" -o "$BIN" "$SRC"
+xcrun swiftc -O -sdk "$(xcrun --show-sdk-path --sdk macosx)" -o "$BIN" "$GEO" "$SRC"
 chmod +x "$BIN"
 xattr -cr "$APP" 2>/dev/null || true
 codesign --force --deep --sign - "$APP" >/dev/null
@@ -78,27 +79,6 @@ else
   launchctl kickstart -k "$LABEL"
 fi
 
-RECT=""
-if [[ -d /Applications/Rectangle.app ]]; then
-  RECT="/Applications/Rectangle.app"
-elif [[ -d "$HOME/Applications/Rectangle.app" ]]; then
-  RECT="$HOME/Applications/Rectangle.app"
-fi
-if [[ -n "$RECT" ]]; then
-  defaults write com.knollsoft.Rectangle windowSnapping -int 1
-  defaults write com.knollsoft.Rectangle launchOnLogin -bool true
-  defaults write com.knollsoft.Rectangle firstThird -dict keyCode -int 18 modifierFlags -int 786432
-  defaults write com.knollsoft.Rectangle centerThird -dict keyCode -int 19 modifierFlags -int 786432
-  defaults write com.knollsoft.Rectangle lastThird -dict keyCode -int 20 modifierFlags -int 786432
-  open -a "$RECT" || true
-  osascript -e "tell application \"System Events\"
-    set names to name of every login item
-    if names does not contain \"Rectangle\" then
-      make login item at end with properties {path:\"$RECT\", hidden:false}
-    end if
-  end tell" >/dev/null 2>&1 || true
-fi
-
 if [[ -n "${ZONE_MODE:-}" ]]; then
   defaults write pro.openos.thirds zoneMode "$ZONE_MODE"
   echo "=== zoneMode $ZONE_MODE ==="
@@ -117,4 +97,5 @@ echo "=== running ==="
 pgrep -lf OpenOSThirds || echo "OpenOSThirds not running"
 defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString
 defaults read pro.openos.thirds zoneMode 2>/dev/null || echo "zoneMode auto"
+echo "Acessibilidade: Definições do Sistema → Privacidade e Segurança → Acessibilidade → OpenOS Thirds"
 echo "OK $APP"
